@@ -1,7 +1,7 @@
-# Enchanced Speech History (VIP Fork)
+# Enchanced Speech History
 This is an updated version of the Clip Copy add-on for NVDA, initially created by Tyler Spivey in 2012. The add-on is compatible with NVDA versions from 2020.4 to 2026.4.
 
-This fork is maintained by VIPPotato and includes fork-specific behavior for history review workflows, including a full `NVDA+Alt+F12` wxPython dialog.
+This add-on is maintained by VIPPotato and includes a full `NVDA+Alt+F12` wxPython dialog for history review workflows.
 
 The original version of the add-on offered two keystrokes:
 * F12: Copy the most recent spoken text to the clipboard
