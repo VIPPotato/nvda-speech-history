@@ -69,8 +69,13 @@ DEFAULT_BEEP_DURATION = 20 # ms
 MIN_BEEP_DURATION = 1 # ms
 MAX_BEEP_DURATION = 500 # ms
 
+DEFAULT_BEEP_VOLUME = 100 # percent
+MIN_BEEP_VOLUME = 0 # percent
+MAX_BEEP_VOLUME = 100 # percent
+
 BOUNDARY_BEEP_FREQUENCY = 200 # Hz
 BOUNDARY_BEEP_DURATION = 100 # ms
+BOUNDARY_BEEP_VOLUME = 100 # percent
 
 HTML_CONTAINER_START = '<ul style="list-style: none">'
 HTML_CONTAINER_END = '</ul>'
@@ -171,9 +176,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			'postCopyAction': f'string(default={DEFAULT_POST_COPY_ACTION})',
 			'beepFrequency': f'integer(default={DEFAULT_BEEP_FREQUENCY}, min={MIN_BEEP_FREQUENCY}, max={MAX_BEEP_FREQUENCY})',
 			'beepDuration': f'integer(default={DEFAULT_BEEP_DURATION}, min={MIN_BEEP_DURATION}, max={MAX_BEEP_DURATION})',
+			'beepVolume': f'integer(default={DEFAULT_BEEP_VOLUME}, min={MIN_BEEP_VOLUME}, max={MAX_BEEP_VOLUME})',
 			'beepBoundaryPanning': 'boolean(default=false)',
 			'boundaryBeepFrequency': f'integer(default={BOUNDARY_BEEP_FREQUENCY}, min={MIN_BEEP_FREQUENCY}, max={MAX_BEEP_FREQUENCY})',
 			'boundaryBeepDuration': f'integer(default={BOUNDARY_BEEP_DURATION}, min={MIN_BEEP_DURATION}, max={MAX_BEEP_DURATION})',
+			'boundaryBeepVolume': f'integer(default={BOUNDARY_BEEP_VOLUME}, min={MIN_BEEP_VOLUME}, max={MAX_BEEP_VOLUME})',
 			'checkForUpdatesOnStartup': 'boolean(default=true)',
 			'trimWhitespaceFromStart': 'boolean(default=false)',
 			'trimWhitespaceFromEnd': 'boolean(default=false)',
@@ -206,9 +213,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def _performPostCopyFeedback(self):
 		postCopyAction = config.conf[CONFIG_SECTION]['postCopyAction']
 		if postCopyAction in (POST_COPY_BEEP, POST_COPY_BOTH):
+			volume = config.conf[CONFIG_SECTION]['beepVolume']
 			tones.beep(
 				config.conf[CONFIG_SECTION]['beepFrequency'],
 				config.conf[CONFIG_SECTION]['beepDuration'],
+				volume,
+				volume,
 			)
 		if postCopyAction in (POST_COPY_SPEAK, POST_COPY_BOTH):
 			# Translators: A short confirmation message spoken after copying a Enchanced Speech History item.
@@ -217,13 +227,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def _beepHistoryBoundary(self, atBeginning):
 		frequency = config.conf[CONFIG_SECTION]['boundaryBeepFrequency']
 		duration = config.conf[CONFIG_SECTION]['boundaryBeepDuration']
+		volume = config.conf[CONFIG_SECTION]['boundaryBeepVolume']
 		if config.conf[CONFIG_SECTION]['beepBoundaryPanning']:
 			if atBeginning:
-				tones.beep(frequency, duration, 0, 100)
+				tones.beep(frequency, duration, 0, volume)
 			else:
-				tones.beep(frequency, duration, 100, 0)
+				tones.beep(frequency, duration, volume, 0)
 			return
-		tones.beep(frequency, duration)
+		tones.beep(frequency, duration, volume, volume)
 
 	def checkForUpdates(self, manual=False):
 		if self._updateCheckInProgress:
@@ -557,6 +568,16 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		beepDurationLabelText = _('Beep &duration (ms)')
 		self.beepDurationEdit = helper.addLabeledControl(beepDurationLabelText, nvdaControls.SelectOnFocusSpinCtrl, min=MIN_BEEP_DURATION, max=MAX_BEEP_DURATION, initial=config.conf[CONFIG_SECTION]['beepDuration'])
 
+		# Translators: The label for the Enchanced Speech History setting controlling post-copy beep volume in percent.
+		beepVolumeLabelText = _('Beep &volume (%)')
+		self.beepVolumeEdit = helper.addLabeledControl(
+			beepVolumeLabelText,
+			nvdaControls.SelectOnFocusSpinCtrl,
+			min=MIN_BEEP_VOLUME,
+			max=MAX_BEEP_VOLUME,
+			initial=config.conf[CONFIG_SECTION]['beepVolume'],
+		)
+
 		# Translators: The label of a button in the Enchanced Speech History settings panel for playing a sample beep to test the user's chosen frequency and duration settings.
 		self.beepButton = helper.addItem(wx.Button(self, label=_('&Play example beep')))
 		self.Bind(wx.EVT_BUTTON, self.onBeepButton, self.beepButton)
@@ -595,6 +616,16 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 			initial=config.conf[CONFIG_SECTION]['boundaryBeepDuration'],
 		)
 
+		# Translators: The label for the boundary beep volume setting in percent.
+		boundaryBeepVolumeLabelText = _('Boundary beep v&olume (%)')
+		self.boundaryBeepVolumeEdit = helper.addLabeledControl(
+			boundaryBeepVolumeLabelText,
+			nvdaControls.SelectOnFocusSpinCtrl,
+			min=MIN_BEEP_VOLUME,
+			max=MAX_BEEP_VOLUME,
+			initial=config.conf[CONFIG_SECTION]['boundaryBeepVolume'],
+		)
+
 		# Translators: A button label for previewing the currently configured boundary beep.
 		self.boundaryBeepButton = helper.addItem(wx.Button(self, label=_('Play &boundary beep')))
 		self.Bind(wx.EVT_BUTTON, self.onBoundaryBeepButton, self.boundaryBeepButton)
@@ -612,13 +643,16 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		enableBeepSettings = postCopyAction in (POST_COPY_BEEP, POST_COPY_BOTH)
 		self.beepFrequencyEdit.Enable(enableBeepSettings)
 		self.beepDurationEdit.Enable(enableBeepSettings)
+		self.beepVolumeEdit.Enable(enableBeepSettings)
 		self.beepButton.Enable(enableBeepSettings)
 
 	def onBeepButton(self, event):
-		tones.beep(self.beepFrequencyEdit.GetValue(), self.beepDurationEdit.GetValue())
+		volume = self.beepVolumeEdit.GetValue()
+		tones.beep(self.beepFrequencyEdit.GetValue(), self.beepDurationEdit.GetValue(), volume, volume)
 
 	def onBoundaryBeepButton(self, event):
-		tones.beep(self.boundaryBeepFrequencyEdit.GetValue(), self.boundaryBeepDurationEdit.GetValue())
+		volume = self.boundaryBeepVolumeEdit.GetValue()
+		tones.beep(self.boundaryBeepFrequencyEdit.GetValue(), self.boundaryBeepDurationEdit.GetValue(), volume, volume)
 
 	def onCheckForUpdatesButton(self, event):
 		addon = GlobalPlugin.getInstance()
@@ -633,9 +667,11 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		config.conf[CONFIG_SECTION]['postCopyAction'] = self.postCopyActionValues[self.postCopyActionCombo.GetSelection()]
 		config.conf[CONFIG_SECTION]['beepFrequency'] = self.beepFrequencyEdit.GetValue()
 		config.conf[CONFIG_SECTION]['beepDuration'] = self.beepDurationEdit.GetValue()
+		config.conf[CONFIG_SECTION]['beepVolume'] = self.beepVolumeEdit.GetValue()
 		config.conf[CONFIG_SECTION]['beepBoundaryPanning'] = self.beepBoundaryPanningCB.GetValue()
 		config.conf[CONFIG_SECTION]['boundaryBeepFrequency'] = self.boundaryBeepFrequencyEdit.GetValue()
 		config.conf[CONFIG_SECTION]['boundaryBeepDuration'] = self.boundaryBeepDurationEdit.GetValue()
+		config.conf[CONFIG_SECTION]['boundaryBeepVolume'] = self.boundaryBeepVolumeEdit.GetValue()
 		config.conf[CONFIG_SECTION]['checkForUpdatesOnStartup'] = self.checkForUpdatesOnStartupCB.GetValue()
 		config.conf[CONFIG_SECTION]['trimWhitespaceFromStart'] = self.trimWhitespaceFromStartCB.GetValue()
 		config.conf[CONFIG_SECTION]['trimWhitespaceFromEnd'] = self.trimWhitespaceFromEndCB.GetValue()
