@@ -156,6 +156,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			'beepFrequency': f'integer(default={DEFAULT_BEEP_FREQUENCY}, min={MIN_BEEP_FREQUENCY}, max={MAX_BEEP_FREQUENCY})',
 			'beepDuration': f'integer(default={DEFAULT_BEEP_DURATION}, min={MIN_BEEP_DURATION}, max={MAX_BEEP_DURATION})',
 			'beepBoundaryPanning': 'boolean(default=false)',
+			'boundaryBeepFrequency': f'integer(default={BOUNDARY_BEEP_FREQUENCY}, min={MIN_BEEP_FREQUENCY}, max={MAX_BEEP_FREQUENCY})',
+			'boundaryBeepDuration': f'integer(default={BOUNDARY_BEEP_DURATION}, min={MIN_BEEP_DURATION}, max={MAX_BEEP_DURATION})',
 			'checkForUpdatesOnStartup': 'boolean(default=true)',
 			'trimWhitespaceFromStart': 'boolean(default=false)',
 			'trimWhitespaceFromEnd': 'boolean(default=false)',
@@ -197,13 +199,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			self._speakMessage(_('Copied'))
 
 	def _beepHistoryBoundary(self, atBeginning):
+		frequency = config.conf[CONFIG_SECTION]['boundaryBeepFrequency']
+		duration = config.conf[CONFIG_SECTION]['boundaryBeepDuration']
 		if config.conf[CONFIG_SECTION]['beepBoundaryPanning']:
 			if atBeginning:
-				tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION, 0, 100)
+				tones.beep(frequency, duration, 0, 100)
 			else:
-				tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION, 100, 0)
+				tones.beep(frequency, duration, 100, 0)
 			return
-		tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION)
+		tones.beep(frequency, duration)
 
 	def checkForUpdates(self, manual=False):
 		if self._updateCheckInProgress:
@@ -550,6 +554,30 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		self.beepBoundaryPanningCB = helper.addItem(wx.CheckBox(self, label=_('Pan history boundary beeps to left/right channels')))
 		self.beepBoundaryPanningCB.SetValue(config.conf[CONFIG_SECTION]['beepBoundaryPanning'])
 
+		# Translators: The label for the boundary beep frequency setting in Hz.
+		boundaryBeepFrequencyLabelText = _('Boundary beep f&requency (Hz)')
+		self.boundaryBeepFrequencyEdit = helper.addLabeledControl(
+			boundaryBeepFrequencyLabelText,
+			nvdaControls.SelectOnFocusSpinCtrl,
+			min=MIN_BEEP_FREQUENCY,
+			max=MAX_BEEP_FREQUENCY,
+			initial=config.conf[CONFIG_SECTION]['boundaryBeepFrequency'],
+		)
+
+		# Translators: The label for the boundary beep duration setting in milliseconds.
+		boundaryBeepDurationLabelText = _('Boundary beep d&uration (ms)')
+		self.boundaryBeepDurationEdit = helper.addLabeledControl(
+			boundaryBeepDurationLabelText,
+			nvdaControls.SelectOnFocusSpinCtrl,
+			min=MIN_BEEP_DURATION,
+			max=MAX_BEEP_DURATION,
+			initial=config.conf[CONFIG_SECTION]['boundaryBeepDuration'],
+		)
+
+		# Translators: A button label for previewing the currently configured boundary beep.
+		self.boundaryBeepButton = helper.addItem(wx.Button(self, label=_('Play &boundary beep')))
+		self.Bind(wx.EVT_BUTTON, self.onBoundaryBeepButton, self.boundaryBeepButton)
+
 		# Translators: Checkbox label for enabling automatic update checks when NVDA starts.
 		self.checkForUpdatesOnStartupCB = helper.addItem(wx.CheckBox(self, label=_('Check for Enchanced Speech History updates when NVDA starts')))
 		self.checkForUpdatesOnStartupCB.SetValue(config.conf[CONFIG_SECTION]['checkForUpdatesOnStartup'])
@@ -568,6 +596,9 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 	def onBeepButton(self, event):
 		tones.beep(self.beepFrequencyEdit.GetValue(), self.beepDurationEdit.GetValue())
 
+	def onBoundaryBeepButton(self, event):
+		tones.beep(self.boundaryBeepFrequencyEdit.GetValue(), self.boundaryBeepDurationEdit.GetValue())
+
 	def onCheckForUpdatesButton(self, event):
 		addon = GlobalPlugin.getInstance()
 		if addon is None:
@@ -582,6 +613,8 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		config.conf[CONFIG_SECTION]['beepFrequency'] = self.beepFrequencyEdit.GetValue()
 		config.conf[CONFIG_SECTION]['beepDuration'] = self.beepDurationEdit.GetValue()
 		config.conf[CONFIG_SECTION]['beepBoundaryPanning'] = self.beepBoundaryPanningCB.GetValue()
+		config.conf[CONFIG_SECTION]['boundaryBeepFrequency'] = self.boundaryBeepFrequencyEdit.GetValue()
+		config.conf[CONFIG_SECTION]['boundaryBeepDuration'] = self.boundaryBeepDurationEdit.GetValue()
 		config.conf[CONFIG_SECTION]['checkForUpdatesOnStartup'] = self.checkForUpdatesOnStartupCB.GetValue()
 		config.conf[CONFIG_SECTION]['trimWhitespaceFromStart'] = self.trimWhitespaceFromStartCB.GetValue()
 		config.conf[CONFIG_SECTION]['trimWhitespaceFromEnd'] = self.trimWhitespaceFromEndCB.GetValue()
