@@ -27,7 +27,7 @@ jobs:
           import zipfile
 
           root = Path(".")
-          manifest_path = root / "speechHistory" / "manifest.ini"
+          manifest_path = root / "enchancedSpeechHistory" / "manifest.ini"
           manifest_text = manifest_path.read_text(encoding="utf-8")
 
           addon_name = None
@@ -39,14 +39,14 @@ jobs:
               addon_version = line.split('"')[1]
 
           if not addon_name or not addon_version:
-            raise RuntimeError("Could not parse add-on name/version from speechHistory/manifest.ini")
+            raise RuntimeError("Could not parse add-on name/version from enchancedSpeechHistory/manifest.ini")
 
           out_file = root / f"{addon_name}-{addon_version}.nvda-addon"
           with zipfile.ZipFile(out_file, "w", zipfile.ZIP_DEFLATED) as addon_zip:
             addon_zip.write(manifest_path, "manifest.ini")
             addon_zip.write(
-              root / "speechHistory" / "globalPlugins" / "speechHistory.py",
-              "globalPlugins/speechHistory.py",
+              root / "enchancedSpeechHistory" / "globalPlugins" / "enchancedSpeechHistory.py",
+              "globalPlugins/enchancedSpeechHistory.py",
             )
           print(f"Created {out_file}")
           PY

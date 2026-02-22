@@ -1,4 +1,4 @@
-# NVDA Speech History Fork - 2026.1
+# Enchanced Speech History Fork - 2026.1
 
 ## Highlights
 - Added a full speech history dialog on `NVDA+Alt+F12` with:

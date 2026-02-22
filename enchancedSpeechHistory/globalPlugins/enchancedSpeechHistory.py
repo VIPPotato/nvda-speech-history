@@ -1,4 +1,4 @@
-# NVDA Add-on: Speech History
+# NVDA Add-on: Enchanced Speech History
 # Copyright (C) 2012 Tyler Spivey
 # Copyright (C) 2015-2025 James Scholes
 # This add-on is free software, licensed under the terms of the GNU General Public License (version 2).
@@ -48,7 +48,7 @@ except ImportError:
 addonHandler.initTranslation()
 
 BUILD_YEAR = getattr(versionInfo, 'version_year', 2021)
-CONFIG_SECTION = 'speechHistory'
+CONFIG_SECTION = 'enchancedSpeechHistory'
 
 DEFAULT_HISTORY_ENTRIES = 500
 MIN_HISTORY_ENTRIES = 1
@@ -77,7 +77,7 @@ HTML_CONTAINER_END = '</ul>'
 HTML_ITEM_START = '<li>'
 HTML_ITEM_END = '</li>'
 
-UPDATE_REPOSITORY = "VIPPotato/nvda-speech-history"
+UPDATE_REPOSITORY = "VIPPotato/nvda-enchanced-speech-history"
 LATEST_RELEASE_API_URL = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 UPDATE_CHECK_TIMEOUT_SECONDS = 8
 UPDATE_DOWNLOAD_TIMEOUT_SECONDS = 120
@@ -110,7 +110,7 @@ def _fetchLatestReleaseInfo():
 		LATEST_RELEASE_API_URL,
 		headers={
 			"Accept": "application/vnd.github+json",
-			"User-Agent": "NVDA-SpeechHistory-Updater",
+			"User-Agent": "NVDA-enchancedSpeechHistory-Updater",
 		},
 	)
 	with urlRequest.urlopen(request, timeout=UPDATE_CHECK_TIMEOUT_SECONDS) as response:
@@ -193,7 +193,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 				config.conf[CONFIG_SECTION]['beepDuration'],
 			)
 		if postCopyAction in (POST_COPY_SPEAK, POST_COPY_BOTH):
-			# Translators: A short confirmation message spoken after copying a speech history item.
+			# Translators: A short confirmation message spoken after copying a Enchanced Speech History item.
 			self._speakMessage(_('Copied'))
 
 	def _beepHistoryBoundary(self, atBeginning):
@@ -209,7 +209,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		if self._updateCheckInProgress:
 			if manual:
 				# Translators: Message reported if an update check is already running.
-				ui.message(_('Speech History update check is already in progress.'))
+				ui.message(_('Enchanced Speech History update check is already in progress.'))
 			return
 		self._updateCheckInProgress = True
 		threading.Thread(
@@ -256,41 +256,41 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 		if errorMessage:
 			if manual:
-				# Translators: Message when Speech History can't check for updates.
-				ui.message(_('Could not check for Speech History updates.'))
+				# Translators: Message when Enchanced Speech History can't check for updates.
+				ui.message(_('Could not check for Enchanced Speech History updates.'))
 			return
 
 		if isNewVersion and latestVersion:
-			# Translators: Prompt shown when a new Speech History version is available.
+			# Translators: Prompt shown when a new Enchanced Speech History version is available.
 			message = _(
-				'A new Speech History version {latestVersion} is available. '
+				'A new Enchanced Speech History version {latestVersion} is available. '
 				'You are currently using {currentVersion}. '
 				'Do you want to download and install it now?'
 			).format(
 				latestVersion=latestVersion,
 				currentVersion=currentVersion,
 			)
-			# Translators: Title for Speech History update prompt dialog.
-			title = _('Speech History update available')
+			# Translators: Title for Enchanced Speech History update prompt dialog.
+			title = _('Enchanced Speech History update available')
 			if gui.messageBox(message, title, wx.YES_NO | wx.ICON_INFORMATION) == wx.YES:
 				self.downloadAndInstallUpdate(downloadUrl, latestVersion)
 			return
 
 		if manual:
-			# Translators: Message reported when no new Speech History update is available.
-			ui.message(_('You are using the latest Speech History version.'))
+			# Translators: Message reported when no new Enchanced Speech History update is available.
+			ui.message(_('You are using the latest Enchanced Speech History version.'))
 
 	def downloadAndInstallUpdate(self, downloadUrl, latestVersion):
 		if self._updateDownloadInProgress:
 			# Translators: Message reported if update download/installation is already running.
-			ui.message(_('Speech History update download is already in progress.'))
+			ui.message(_('Enchanced Speech History update download is already in progress.'))
 			return
 		if not downloadUrl:
 			# Translators: Message reported if a newer version exists but no installable package asset is available.
 			ui.message(_('Update found, but no .nvda-addon package is available in this release.'))
 			return
-		# Translators: Message reported when Speech History starts downloading an update package.
-		ui.message(_('Downloading Speech History update.'))
+		# Translators: Message reported when Enchanced Speech History starts downloading an update package.
+		ui.message(_('Downloading Enchanced Speech History update.'))
 		self._updateDownloadInProgress = True
 		threading.Thread(
 			target=self._downloadAndInstallUpdateWorker,
@@ -304,14 +304,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		try:
 			request = urlRequest.Request(
 				downloadUrl,
-				headers={"User-Agent": "NVDA-SpeechHistory-Updater"},
+				headers={"User-Agent": "NVDA-enchancedSpeechHistory-Updater"},
 			)
 			with urlRequest.urlopen(request, timeout=UPDATE_DOWNLOAD_TIMEOUT_SECONDS) as response:
 				data = response.read()
 			if not data:
 				raise ValueError("Downloaded update package is empty")
 			safeVersion = re.sub(r"[^0-9A-Za-z._-]", "-", str(latestVersion))
-			fileName = f"speechHistory-{safeVersion}.nvda-addon"
+			fileName = f"enchancedSpeechHistory-{safeVersion}.nvda-addon"
 			downloadedPath = os.path.join(tempfile.gettempdir(), fileName)
 			with open(downloadedPath, "wb") as addonPackage:
 				addonPackage.write(data)
@@ -328,14 +328,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._updateDownloadInProgress = False
 		if errorMessage:
 			# Translators: Message reported when update download fails.
-			ui.message(_('Speech History update download failed.'))
+			ui.message(_('Enchanced Speech History update download failed.'))
 			return
 		if not downloadedPath or not os.path.isfile(downloadedPath):
 			# Translators: Message reported when update package is missing after download.
-			ui.message(_('Speech History update package could not be prepared.'))
+			ui.message(_('Enchanced Speech History update package could not be prepared.'))
 			return
 		# Translators: Message reported when the add-on begins installation of a downloaded update package.
-		ui.message(_('Installing Speech History update.'))
+		ui.message(_('Installing Enchanced Speech History update.'))
 		if addonGui and hasattr(addonGui, "handleRemoteAddonInstall"):
 			addonGui.handleRemoteAddonInstall(downloadedPath)
 			return
@@ -356,8 +356,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		if api.copyToClip(text):
 			self._performPostCopyFeedback()
 
-	# Translators: Documentation string for copy currently selected speech history item script
-	script_copyLast.__doc__ = _('Copy the currently selected speech history item to the clipboard, which by default will be the most recently spoken text by NVDA.')
+	# Translators: Documentation string for copy currently selected Enchanced Speech History item script
+	script_copyLast.__doc__ = _('Copy the currently selected Enchanced Speech History item to the clipboard, which by default will be the most recently spoken text by NVDA.')
 	script_copyLast.category = SCRCAT_SPEECH
 
 	def script_prevString(self, gesture):
@@ -370,8 +370,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			self._beepHistoryBoundary(atBeginning=False)
 			self.history_pos -= 1
 		self.oldSpeak(self._history[self.history_pos])
-	# Translators: Documentation string for previous speech history item script
-	script_prevString.__doc__ = _('Review the previous item in NVDA\'s speech history.')
+	# Translators: Documentation string for previous Enchanced Speech History item script
+	script_prevString.__doc__ = _('Review the previous item in NVDA\'s Enchanced Speech History.')
 	script_prevString.category = SCRCAT_SPEECH
 
 	def script_nextString(self, gesture):
@@ -385,8 +385,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			self.history_pos += 1
 
 		self.oldSpeak(self._history[self.history_pos])
-	# Translators: Documentation string for next speech history item script
-	script_nextString.__doc__ = _('Review the next item in NVDA\'s speech history.')
+	# Translators: Documentation string for next Enchanced Speech History item script
+	script_nextString.__doc__ = _('Review the next item in NVDA\'s Enchanced Speech History.')
 	script_nextString.category = SCRCAT_SPEECH
 
 	def script_startRecording(self, gesture):
@@ -424,23 +424,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	def script_showHistory(self, gesture):
 		if not BROWSE_MODE_HISTORY_SUPPORTED:
-			# Translators: A message shown when users try to view their speech history while running a version of NVDA where this function is not supported.
-			message = _('Viewing speech history is not supported in this version of NVDA for security reasons.')
+			# Translators: A message shown when users try to view their Enchanced Speech History while running a version of NVDA where this function is not supported.
+			message = _('Viewing Enchanced Speech History is not supported in this version of NVDA for security reasons.')
 		elif not self._history:
-			# Translators: A message shown when users try to view their speech history but it's empty.
+			# Translators: A message shown when users try to view their Enchanced Speech History but it's empty.
 			message = _('No history items.')
 		else:
 			message = makeHTMLList((self.getSequenceText(item) for item in self._history))
 
-		# Translators: The title of the speech history window.
-		title = _('Speech History')
+		# Translators: The title of the Enchanced Speech History window.
+		title = _('Enchanced Speech History')
 
 		try:
 			ui.browseableMessage(message=message, title=title, isHtml=True, closeButton=True, sanitizeHtmlFunc=lambda string: string)
 		except TypeError:
 			ui.browseableMessage(message=message, title=title, isHtml=True)
-	# Translators: Documentation string for show speech history script
-	script_showHistory.__doc__ = _("Show NVDA's speech history in a browseable list")
+	# Translators: Documentation string for show Enchanced Speech History script
+	script_showHistory.__doc__ = _("Show NVDA's Enchanced Speech History in a browseable list")
 	script_showHistory.category = SCRCAT_SPEECH
 
 	def script_showHistoryDialog(self, gesture):
@@ -449,7 +449,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		dialog.Show()
 		dialog.Raise()
 		gui.mainFrame.postPopup()
-	# Translators: Documentation string for show speech history dialog script.
+	# Translators: Documentation string for show Enchanced Speech History dialog script.
 	script_showHistoryDialog.__doc__ = _('Open a dialog showing recent items spoken by NVDA.')
 	script_showHistoryDialog.category = SCRCAT_SPEECH
 
@@ -496,8 +496,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 
 class SpeechHistorySettingsPanel(SettingsPanel):
-	# Translators: the label/title for the Speech History settings panel.
-	title = _('Speech History')
+	# Translators: the label/title for the Enchanced Speech History settings panel.
+	title = _('Enchanced Speech History')
 
 	def makeSettings(self, settingsSizer):
 		helper = guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
@@ -506,7 +506,7 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		maxHistoryLengthLabelText = _('&Maximum number of history entries (requires NVDA restart to take effect)')
 		self.maxHistoryLengthEdit = helper.addLabeledControl(maxHistoryLengthLabelText, nvdaControls.SelectOnFocusSpinCtrl, min=MIN_HISTORY_ENTRIES, max=MAX_HISTORY_ENTRIES, initial=config.conf[CONFIG_SECTION]['maxHistoryLength'])
 
-		# Translators: The label for the preference of what to do after copying a speech history item to the clipboard. The options are "Do nothing", "Beep", "Speak", or "Beep and speak".
+		# Translators: The label for the preference of what to do after copying a Enchanced Speech History item to the clipboard. The options are "Do nothing", "Beep", "Speak", or "Beep and speak".
 		postCopyActionComboText = _('&After copying speech:')
 		postCopyActionChoices = [
 			# Translators: A SpeechHistory option to have NVDA do nothing (no beep or speech) after copying a history item.
@@ -524,15 +524,15 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		self.postCopyActionCombo.defaultValue = self.postCopyActionValues.index(DEFAULT_POST_COPY_ACTION)
 		self.postCopyActionCombo.Bind(wx.EVT_CHOICE, lambda evt: self.refreshUI())
 
-		# Translators: The label for the speech history setting controlling the frequency of the post-copy beep (in Hz).
+		# Translators: The label for the Enchanced Speech History setting controlling the frequency of the post-copy beep (in Hz).
 		beepFrequencyLabelText = _('Beep &frequency (Hz)')
 		self.beepFrequencyEdit = helper.addLabeledControl(beepFrequencyLabelText, nvdaControls.SelectOnFocusSpinCtrl, min=MIN_BEEP_FREQUENCY, max=MAX_BEEP_FREQUENCY, initial=config.conf[CONFIG_SECTION]['beepFrequency'])
 
-		# Translators: The label for the speech history setting controlling the length of the post-copy beep (in milliseconds).
+		# Translators: The label for the Enchanced Speech History setting controlling the length of the post-copy beep (in milliseconds).
 		beepDurationLabelText = _('Beep &duration (ms)')
 		self.beepDurationEdit = helper.addLabeledControl(beepDurationLabelText, nvdaControls.SelectOnFocusSpinCtrl, min=MIN_BEEP_DURATION, max=MAX_BEEP_DURATION, initial=config.conf[CONFIG_SECTION]['beepDuration'])
 
-		# Translators: The label of a button in the Speech History settings panel for playing a sample beep to test the user's chosen frequency and duration settings.
+		# Translators: The label of a button in the Enchanced Speech History settings panel for playing a sample beep to test the user's chosen frequency and duration settings.
 		self.beepButton = helper.addItem(wx.Button(self, label=_('&Play example beep')))
 		self.Bind(wx.EVT_BUTTON, self.onBeepButton, self.beepButton)
 
@@ -551,10 +551,10 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		self.beepBoundaryPanningCB.SetValue(config.conf[CONFIG_SECTION]['beepBoundaryPanning'])
 
 		# Translators: Checkbox label for enabling automatic update checks when NVDA starts.
-		self.checkForUpdatesOnStartupCB = helper.addItem(wx.CheckBox(self, label=_('Check for Speech History updates when NVDA starts')))
+		self.checkForUpdatesOnStartupCB = helper.addItem(wx.CheckBox(self, label=_('Check for Enchanced Speech History updates when NVDA starts')))
 		self.checkForUpdatesOnStartupCB.SetValue(config.conf[CONFIG_SECTION]['checkForUpdatesOnStartup'])
 
-		# Translators: Button label for manually checking Speech History updates.
+		# Translators: Button label for manually checking Enchanced Speech History updates.
 		self.checkForUpdatesButton = helper.addItem(wx.Button(self, label=_('Check for &updates now')))
 		self.Bind(wx.EVT_BUTTON, self.onCheckForUpdatesButton, self.checkForUpdatesButton)
 
@@ -572,7 +572,7 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		addon = GlobalPlugin.getInstance()
 		if addon is None:
 			# Translators: Message reported when update check cannot run because add-on instance is unavailable.
-			ui.message(_('Speech History update check is unavailable right now.'))
+			ui.message(_('Enchanced Speech History update check is unavailable right now.'))
 			return
 		addon.checkForUpdates(manual=True)
 
@@ -598,7 +598,7 @@ class HistoryDialog(
 		"""
 		return None
 
-	helpId = "speechHistoryElementsList"
+	helpId = "enchancedSpeechHistoryElementsList"
 
 	def __new__(cls, *args, **kwargs):
 		instance = HistoryDialog._instance()
@@ -614,7 +614,7 @@ class HistoryDialog(
 
 		HistoryDialog._instance = weakref.ref(self)
 		# Translators: The title of the history elements dialog.
-		title = _("Speech history items")
+		title = _("Enchanced Speech History items")
 		super().__init__(
 			parent,
 			title=title,
@@ -632,7 +632,7 @@ class HistoryDialog(
 		szCurrent = guiHelper.BoxSizerHelper(self, sizer=wx.BoxSizer(wx.HORIZONTAL))
 		szBottom = guiHelper.BoxSizerHelper(self, sizer=wx.BoxSizer(wx.HORIZONTAL))
 
-		# Translators: The label for the search text field in the Speech History dialog.
+		# Translators: The label for the search text field in the Enchanced Speech History dialog.
 		self.searchTextField = szMain.addLabeledControl(
 			_("&Search"),
 			wx.TextCtrl,
@@ -641,7 +641,7 @@ class HistoryDialog(
 		self.searchTextField.Bind(wx.EVT_TEXT_ENTER, self.onSearch)
 		self.searchTextField.Bind(wx.EVT_KILL_FOCUS, self.onSearch)
 
-		# Translators: The label for the history entries list in the Speech History dialog.
+		# Translators: The label for the history entries list in the Enchanced Speech History dialog.
 		entriesLabel = _("History list")
 		self.historyList = nvdaControls.AutoWidthColumnListCtrl(
 			parent=self,
@@ -661,7 +661,7 @@ class HistoryDialog(
 			proportion=1,
 		)
 
-		# Translators: Label for the copy button in the Speech History dialog.
+		# Translators: Label for the copy button in the Enchanced Speech History dialog.
 		self.copyButton = szCurrent.addItem(wx.Button(self, label=_("&Copy item")), proportion=0)
 		self.copyButton.Bind(wx.EVT_BUTTON, self.onCopy)
 		szMain.addItem(
@@ -677,19 +677,19 @@ class HistoryDialog(
 			flag=wx.ALL | wx.EXPAND,
 		)
 
-		# Translators: Label for the copy all button in the Speech History dialog.
+		# Translators: Label for the copy all button in the Enchanced Speech History dialog.
 		self.copyAllButton = szBottom.addItem(wx.Button(self, label=_("Copy &all")))
 		self.copyAllButton.Bind(wx.EVT_BUTTON, self.onCopyAll)
 
-		# Translators: Label for the clear history button in the Speech History dialog.
+		# Translators: Label for the clear history button in the Enchanced Speech History dialog.
 		self.clearHistoryButton = szBottom.addItem(wx.Button(self, label=_("C&lear history")))
 		self.clearHistoryButton.Bind(wx.EVT_BUTTON, self.onClear)
 
-		# Translators: Label for the refresh button in the Speech History dialog.
+		# Translators: Label for the refresh button in the Enchanced Speech History dialog.
 		self.refreshButton = szBottom.addItem(wx.Button(self, label=_("&Refresh history")))
 		self.refreshButton.Bind(wx.EVT_BUTTON, self.onRefresh)
 
-		# Translators: The label of a button to close the Speech History dialog.
+		# Translators: The label of a button to close the Enchanced Speech History dialog.
 		closeButton = wx.Button(self, label=_("C&lose"), id=wx.ID_CLOSE)
 		closeButton.Bind(wx.EVT_BUTTON, lambda evt: self.Close())
 		szBottom.addItem(closeButton)
