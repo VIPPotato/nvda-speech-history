@@ -61,11 +61,11 @@ POST_COPY_BOTH = 'speakAndBeep'
 
 DEFAULT_POST_COPY_ACTION = POST_COPY_BEEP
 
-DEFAULT_BEEP_FREQUENCY = 1500 # Hz
+DEFAULT_BEEP_FREQUENCY = 400 # Hz
 MIN_BEEP_FREQUENCY = 1 # Hz
 MAX_BEEP_FREQUENCY = 20000 # Hz
 
-DEFAULT_BEEP_DURATION = 120 # ms
+DEFAULT_BEEP_DURATION = 20 # ms
 MIN_BEEP_DURATION = 1 # ms
 MAX_BEEP_DURATION = 500 # ms
 
@@ -156,7 +156,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			'beepFrequency': f'integer(default={DEFAULT_BEEP_FREQUENCY}, min={MIN_BEEP_FREQUENCY}, max={MAX_BEEP_FREQUENCY})',
 			'beepDuration': f'integer(default={DEFAULT_BEEP_DURATION}, min={MIN_BEEP_DURATION}, max={MAX_BEEP_DURATION})',
 			'beepBoundaryPanning': 'boolean(default=false)',
-			'checkForUpdatesOnStartup': 'boolean(default=false)',
+			'checkForUpdatesOnStartup': 'boolean(default=true)',
 			'trimWhitespaceFromStart': 'boolean(default=false)',
 			'trimWhitespaceFromEnd': 'boolean(default=false)',
 		}
