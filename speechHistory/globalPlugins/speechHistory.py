@@ -117,9 +117,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def _beepHistoryBoundary(self, atBeginning):
 		if config.conf[CONFIG_SECTION]['beepBoundaryPanning']:
 			if atBeginning:
-				tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION, 100, 0)
-			else:
 				tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION, 0, 100)
+			else:
+				tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION, 100, 0)
 			return
 		tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION)
 
