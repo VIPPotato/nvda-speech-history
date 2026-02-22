@@ -81,14 +81,18 @@ jobs:
             echo >> changelog.md
             echo "Automated release." >> changelog.md
           fi
+          if ! ls ./*.nvda-addon >/dev/null 2>&1; then
+            echo "No .nvda-addon assets found after artifact download."
+            exit 1
+          fi
           echo -e "\nSHA256:\n" >> changelog.md
-          sha256sum packaged_addon/*.nvda-addon >> changelog.md
+          sha256sum ./*.nvda-addon >> changelog.md
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            packaged_addon/*.nvda-addon
+            ./*.nvda-addon
           body_path: changelog.md
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref, '-') }}
