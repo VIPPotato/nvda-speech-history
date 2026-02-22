@@ -6,10 +6,11 @@
 
 from collections import deque
 import json
+import os
 import re
+import tempfile
 import threading
 import weakref
-import webbrowser
 from urllib import error as urlError
 from urllib import request as urlRequest
 
@@ -31,6 +32,11 @@ from gui import guiHelper, nvdaControls
 from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
 from gui.settingsDialogs import NVDASettingsDialog, SettingsPanel
 from globalCommands import SCRCAT_SPEECH
+
+try:
+	from gui import addonGui
+except Exception:
+	addonGui = None
 
 try:
 	import nh3
@@ -73,8 +79,8 @@ HTML_ITEM_END = '</li>'
 
 UPDATE_REPOSITORY = "VIPPotato/nvda-speech-history"
 LATEST_RELEASE_API_URL = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
-LATEST_RELEASE_PAGE_URL = f"https://github.com/{UPDATE_REPOSITORY}/releases/latest"
 UPDATE_CHECK_TIMEOUT_SECONDS = 8
+UPDATE_DOWNLOAD_TIMEOUT_SECONDS = 120
 
 
 def makeHTMLList(strings):
@@ -112,8 +118,14 @@ def _fetchLatestReleaseInfo():
 	latestVersion = data.get("tag_name") or data.get("name")
 	if not latestVersion:
 		raise ValueError("Latest release version is missing from GitHub response")
-	latestUrl = data.get("html_url") or LATEST_RELEASE_PAGE_URL
-	return str(latestVersion), str(latestUrl)
+	downloadUrl = None
+	for asset in data.get("assets", []):
+		assetName = str(asset.get("name", ""))
+		assetUrl = asset.get("browser_download_url")
+		if assetName.lower().endswith(".nvda-addon") and assetUrl:
+			downloadUrl = str(assetUrl)
+			break
+	return str(latestVersion), downloadUrl
 
 
 def _getCurrentAddonVersion():
@@ -156,6 +168,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._recorded = []
 		self._recording = False
 		self._updateCheckInProgress = False
+		self._updateDownloadInProgress = False
 		self.history_pos = 0
 		self._patch()
 		if config.conf[CONFIG_SECTION]['checkForUpdatesOnStartup']:
@@ -208,12 +221,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def _checkForUpdatesWorker(self, manual):
 		currentVersion = _getCurrentAddonVersion()
 		latestVersion = None
-		latestUrl = LATEST_RELEASE_PAGE_URL
+		downloadUrl = None
 		errorMessage = None
 		isNewVersion = False
 
 		try:
-			latestVersion, latestUrl = _fetchLatestReleaseInfo()
+			latestVersion, downloadUrl = _fetchLatestReleaseInfo()
 			isNewVersion = _isVersionNewer(currentVersion, latestVersion)
 		except (urlError.URLError, ValueError, json.JSONDecodeError) as e:
 			errorMessage = str(e)
@@ -225,7 +238,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			manual,
 			currentVersion,
 			latestVersion,
-			latestUrl,
+			downloadUrl,
 			isNewVersion,
 			errorMessage,
 		)
@@ -235,7 +248,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			manual,
 			currentVersion,
 			latestVersion,
-			latestUrl,
+			downloadUrl,
 			isNewVersion,
 			errorMessage,
 	):
@@ -252,7 +265,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			message = _(
 				'A new Speech History version {latestVersion} is available. '
 				'You are currently using {currentVersion}. '
-				'Do you want to open the download page?'
+				'Do you want to download and install it now?'
 			).format(
 				latestVersion=latestVersion,
 				currentVersion=currentVersion,
@@ -260,12 +273,74 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			# Translators: Title for Speech History update prompt dialog.
 			title = _('Speech History update available')
 			if gui.messageBox(message, title, wx.YES_NO | wx.ICON_INFORMATION) == wx.YES:
-				webbrowser.open(latestUrl)
+				self.downloadAndInstallUpdate(downloadUrl, latestVersion)
 			return
 
 		if manual:
 			# Translators: Message reported when no new Speech History update is available.
 			ui.message(_('You are using the latest Speech History version.'))
+
+	def downloadAndInstallUpdate(self, downloadUrl, latestVersion):
+		if self._updateDownloadInProgress:
+			# Translators: Message reported if update download/installation is already running.
+			ui.message(_('Speech History update download is already in progress.'))
+			return
+		if not downloadUrl:
+			# Translators: Message reported if a newer version exists but no installable package asset is available.
+			ui.message(_('Update found, but no .nvda-addon package is available in this release.'))
+			return
+		# Translators: Message reported when Speech History starts downloading an update package.
+		ui.message(_('Downloading Speech History update.'))
+		self._updateDownloadInProgress = True
+		threading.Thread(
+			target=self._downloadAndInstallUpdateWorker,
+			args=(downloadUrl, latestVersion),
+			daemon=True,
+		).start()
+
+	def _downloadAndInstallUpdateWorker(self, downloadUrl, latestVersion):
+		errorMessage = None
+		downloadedPath = None
+		try:
+			request = urlRequest.Request(
+				downloadUrl,
+				headers={"User-Agent": "NVDA-SpeechHistory-Updater"},
+			)
+			with urlRequest.urlopen(request, timeout=UPDATE_DOWNLOAD_TIMEOUT_SECONDS) as response:
+				data = response.read()
+			if not data:
+				raise ValueError("Downloaded update package is empty")
+			safeVersion = re.sub(r"[^0-9A-Za-z._-]", "-", str(latestVersion))
+			fileName = f"speechHistory-{safeVersion}.nvda-addon"
+			downloadedPath = os.path.join(tempfile.gettempdir(), fileName)
+			with open(downloadedPath, "wb") as addonPackage:
+				addonPackage.write(data)
+		except Exception as e:
+			errorMessage = str(e)
+
+		wx.CallAfter(
+			self._onUpdateDownloadComplete,
+			downloadedPath,
+			errorMessage,
+		)
+
+	def _onUpdateDownloadComplete(self, downloadedPath, errorMessage):
+		self._updateDownloadInProgress = False
+		if errorMessage:
+			# Translators: Message reported when update download fails.
+			ui.message(_('Speech History update download failed.'))
+			return
+		if not downloadedPath or not os.path.isfile(downloadedPath):
+			# Translators: Message reported when update package is missing after download.
+			ui.message(_('Speech History update package could not be prepared.'))
+			return
+		# Translators: Message reported when the add-on begins installation of a downloaded update package.
+		ui.message(_('Installing Speech History update.'))
+		if addonGui and hasattr(addonGui, "handleRemoteAddonInstall"):
+			addonGui.handleRemoteAddonInstall(downloadedPath)
+			return
+		# Translators: Message reported when NVDA install API is unavailable.
+		ui.message(_('Automatic install is not available in this NVDA version.'))
 
 	def script_copyLast(self, gesture):
 		if not self._history:
