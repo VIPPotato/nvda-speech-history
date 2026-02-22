@@ -5,7 +5,13 @@
 # See the file LICENSE for more details.
 
 from collections import deque
+import json
+import re
+import threading
 import weakref
+import webbrowser
+from urllib import error as urlError
+from urllib import request as urlRequest
 
 import wx
 
@@ -65,13 +71,71 @@ HTML_CONTAINER_END = '</ul>'
 HTML_ITEM_START = '<li>'
 HTML_ITEM_END = '</li>'
 
+UPDATE_REPOSITORY = "VIPPotato/nvda-speech-history"
+LATEST_RELEASE_API_URL = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
+LATEST_RELEASE_PAGE_URL = f"https://github.com/{UPDATE_REPOSITORY}/releases/latest"
+UPDATE_CHECK_TIMEOUT_SECONDS = 8
+
 
 def makeHTMLList(strings):
 	listItems = ''.join((f'{HTML_ITEM_START}{string}{HTML_ITEM_END}' for string in map(nh3.clean_text, strings)))
 	return f'{HTML_CONTAINER_START}{listItems}{HTML_CONTAINER_END}'
 
 
+def _versionToTuple(version):
+	versionString = str(version).strip().lstrip("vV")
+	parts = [int(part) for part in re.findall(r"\d+", versionString)]
+	if not parts:
+		return (0,)
+	return tuple(parts)
+
+
+def _isVersionNewer(currentVersion, latestVersion):
+	currentParts = _versionToTuple(currentVersion)
+	latestParts = _versionToTuple(latestVersion)
+	maxLen = max(len(currentParts), len(latestParts))
+	currentParts += (0,) * (maxLen - len(currentParts))
+	latestParts += (0,) * (maxLen - len(latestParts))
+	return latestParts > currentParts
+
+
+def _fetchLatestReleaseInfo():
+	request = urlRequest.Request(
+		LATEST_RELEASE_API_URL,
+		headers={
+			"Accept": "application/vnd.github+json",
+			"User-Agent": "NVDA-SpeechHistory-Updater",
+		},
+	)
+	with urlRequest.urlopen(request, timeout=UPDATE_CHECK_TIMEOUT_SECONDS) as response:
+		data = json.loads(response.read().decode("utf-8"))
+	latestVersion = data.get("tag_name") or data.get("name")
+	if not latestVersion:
+		raise ValueError("Latest release version is missing from GitHub response")
+	latestUrl = data.get("html_url") or LATEST_RELEASE_PAGE_URL
+	return str(latestVersion), str(latestUrl)
+
+
+def _getCurrentAddonVersion():
+	try:
+		addon = addonHandler.getCodeAddon()
+		version = addon.manifest.get("version")
+		if version:
+			return str(version)
+	except Exception:
+		pass
+	return "0"
+
+
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
+	_instanceRef = None
+
+	@classmethod
+	def getInstance(cls):
+		if cls._instanceRef is None:
+			return None
+		return cls._instanceRef()
+
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		confspec = {
@@ -80,17 +144,22 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			'beepFrequency': f'integer(default={DEFAULT_BEEP_FREQUENCY}, min={MIN_BEEP_FREQUENCY}, max={MAX_BEEP_FREQUENCY})',
 			'beepDuration': f'integer(default={DEFAULT_BEEP_DURATION}, min={MIN_BEEP_DURATION}, max={MAX_BEEP_DURATION})',
 			'beepBoundaryPanning': 'boolean(default=false)',
+			'checkForUpdatesOnStartup': 'boolean(default=false)',
 			'trimWhitespaceFromStart': 'boolean(default=false)',
 			'trimWhitespaceFromEnd': 'boolean(default=false)',
 		}
 		config.conf.spec[CONFIG_SECTION] = confspec
 		NVDASettingsDialog.categoryClasses.append(SpeechHistorySettingsPanel)
+		GlobalPlugin._instanceRef = weakref.ref(self)
 
 		self._history = deque(maxlen=config.conf[CONFIG_SECTION]['maxHistoryLength'])
 		self._recorded = []
 		self._recording = False
+		self._updateCheckInProgress = False
 		self.history_pos = 0
 		self._patch()
+		if config.conf[CONFIG_SECTION]['checkForUpdatesOnStartup']:
+			self.checkForUpdates(manual=False)
 
 	def _patch(self):
 		if BUILD_YEAR >= 2021:
@@ -122,6 +191,81 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 				tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION, 100, 0)
 			return
 		tones.beep(BOUNDARY_BEEP_FREQUENCY, BOUNDARY_BEEP_DURATION)
+
+	def checkForUpdates(self, manual=False):
+		if self._updateCheckInProgress:
+			if manual:
+				# Translators: Message reported if an update check is already running.
+				ui.message(_('Speech History update check is already in progress.'))
+			return
+		self._updateCheckInProgress = True
+		threading.Thread(
+			target=self._checkForUpdatesWorker,
+			args=(manual,),
+			daemon=True,
+		).start()
+
+	def _checkForUpdatesWorker(self, manual):
+		currentVersion = _getCurrentAddonVersion()
+		latestVersion = None
+		latestUrl = LATEST_RELEASE_PAGE_URL
+		errorMessage = None
+		isNewVersion = False
+
+		try:
+			latestVersion, latestUrl = _fetchLatestReleaseInfo()
+			isNewVersion = _isVersionNewer(currentVersion, latestVersion)
+		except (urlError.URLError, ValueError, json.JSONDecodeError) as e:
+			errorMessage = str(e)
+		except Exception as e:
+			errorMessage = str(e)
+
+		wx.CallAfter(
+			self._onUpdateCheckComplete,
+			manual,
+			currentVersion,
+			latestVersion,
+			latestUrl,
+			isNewVersion,
+			errorMessage,
+		)
+
+	def _onUpdateCheckComplete(
+			self,
+			manual,
+			currentVersion,
+			latestVersion,
+			latestUrl,
+			isNewVersion,
+			errorMessage,
+	):
+		self._updateCheckInProgress = False
+
+		if errorMessage:
+			if manual:
+				# Translators: Message when Speech History can't check for updates.
+				ui.message(_('Could not check for Speech History updates.'))
+			return
+
+		if isNewVersion and latestVersion:
+			# Translators: Prompt shown when a new Speech History version is available.
+			message = _(
+				'A new Speech History version {latestVersion} is available. '
+				'You are currently using {currentVersion}. '
+				'Do you want to open the download page?'
+			).format(
+				latestVersion=latestVersion,
+				currentVersion=currentVersion,
+			)
+			# Translators: Title for Speech History update prompt dialog.
+			title = _('Speech History update available')
+			if gui.messageBox(message, title, wx.YES_NO | wx.ICON_INFORMATION) == wx.YES:
+				webbrowser.open(latestUrl)
+			return
+
+		if manual:
+			# Translators: Message reported when no new Speech History update is available.
+			ui.message(_('You are using the latest Speech History version.'))
 
 	def script_copyLast(self, gesture):
 		if not self._history:
@@ -241,6 +385,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		else:
 			speech.speak = self.oldSpeak
 		NVDASettingsDialog.categoryClasses.remove(SpeechHistorySettingsPanel)
+		if GlobalPlugin.getInstance() is self:
+			GlobalPlugin._instanceRef = None
 
 	def append_to_history(self, seq):
 		seq = [command for command in seq if not isinstance(command, FocusLossCancellableSpeechCommand)]
@@ -329,6 +475,14 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 		self.beepBoundaryPanningCB = helper.addItem(wx.CheckBox(self, label=_('Pan history boundary beeps to left/right channels')))
 		self.beepBoundaryPanningCB.SetValue(config.conf[CONFIG_SECTION]['beepBoundaryPanning'])
 
+		# Translators: Checkbox label for enabling automatic update checks when NVDA starts.
+		self.checkForUpdatesOnStartupCB = helper.addItem(wx.CheckBox(self, label=_('Check for Speech History updates when NVDA starts')))
+		self.checkForUpdatesOnStartupCB.SetValue(config.conf[CONFIG_SECTION]['checkForUpdatesOnStartup'])
+
+		# Translators: Button label for manually checking Speech History updates.
+		self.checkForUpdatesButton = helper.addItem(wx.Button(self, label=_('Check for &updates now')))
+		self.Bind(wx.EVT_BUTTON, self.onCheckForUpdatesButton, self.checkForUpdatesButton)
+
 	def refreshUI(self):
 		postCopyAction = self.postCopyActionValues[self.postCopyActionCombo.GetSelection()]
 		enableBeepSettings = postCopyAction in (POST_COPY_BEEP, POST_COPY_BOTH)
@@ -339,12 +493,21 @@ class SpeechHistorySettingsPanel(SettingsPanel):
 	def onBeepButton(self, event):
 		tones.beep(self.beepFrequencyEdit.GetValue(), self.beepDurationEdit.GetValue())
 
+	def onCheckForUpdatesButton(self, event):
+		addon = GlobalPlugin.getInstance()
+		if addon is None:
+			# Translators: Message reported when update check cannot run because add-on instance is unavailable.
+			ui.message(_('Speech History update check is unavailable right now.'))
+			return
+		addon.checkForUpdates(manual=True)
+
 	def onSave(self):
 		config.conf[CONFIG_SECTION]['maxHistoryLength'] = self.maxHistoryLengthEdit.GetValue()
 		config.conf[CONFIG_SECTION]['postCopyAction'] = self.postCopyActionValues[self.postCopyActionCombo.GetSelection()]
 		config.conf[CONFIG_SECTION]['beepFrequency'] = self.beepFrequencyEdit.GetValue()
 		config.conf[CONFIG_SECTION]['beepDuration'] = self.beepDurationEdit.GetValue()
 		config.conf[CONFIG_SECTION]['beepBoundaryPanning'] = self.beepBoundaryPanningCB.GetValue()
+		config.conf[CONFIG_SECTION]['checkForUpdatesOnStartup'] = self.checkForUpdatesOnStartupCB.GetValue()
 		config.conf[CONFIG_SECTION]['trimWhitespaceFromStart'] = self.trimWhitespaceFromStartCB.GetValue()
 		config.conf[CONFIG_SECTION]['trimWhitespaceFromEnd'] = self.trimWhitespaceFromEndCB.GetValue()
 
