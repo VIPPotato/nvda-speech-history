@@ -79,6 +79,7 @@ HTML_ITEM_END = '</li>'
 
 UPDATE_REPOSITORY = "VIPPotato/nvda-enchanced-speech-history"
 LATEST_RELEASE_API_URL = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
+LATEST_TAGS_API_URL = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/tags?per_page=1"
 UPDATE_CHECK_TIMEOUT_SECONDS = 8
 UPDATE_DOWNLOAD_TIMEOUT_SECONDS = 120
 
@@ -105,16 +106,31 @@ def _isVersionNewer(currentVersion, latestVersion):
 	return latestParts > currentParts
 
 
-def _fetchLatestReleaseInfo():
+def _fetchJSONFromGitHub(url):
 	request = urlRequest.Request(
-		LATEST_RELEASE_API_URL,
+		url,
 		headers={
 			"Accept": "application/vnd.github+json",
 			"User-Agent": "NVDA-enchancedSpeechHistory-Updater",
 		},
 	)
 	with urlRequest.urlopen(request, timeout=UPDATE_CHECK_TIMEOUT_SECONDS) as response:
-		data = json.loads(response.read().decode("utf-8"))
+		return json.loads(response.read().decode("utf-8"))
+
+
+def _fetchLatestReleaseInfo():
+	try:
+		data = _fetchJSONFromGitHub(LATEST_RELEASE_API_URL)
+	except urlError.HTTPError as e:
+		if e.code != 404:
+			raise
+		tagsData = _fetchJSONFromGitHub(LATEST_TAGS_API_URL)
+		if not isinstance(tagsData, list) or not tagsData:
+			raise ValueError("No release or tag information is available from GitHub")
+		latestTag = tagsData[0].get("name")
+		if not latestTag:
+			raise ValueError("Latest tag name is missing from GitHub response")
+		return str(latestTag), None
 	latestVersion = data.get("tag_name") or data.get("name")
 	if not latestVersion:
 		raise ValueError("Latest release version is missing from GitHub response")
@@ -265,6 +281,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 
 		if isNewVersion and latestVersion:
+			if not downloadUrl:
+				if manual:
+					# Translators: Message reported when a newer version exists but no downloadable package asset is available.
+					ui.message(_('A newer Enchanced Speech History version is available, but no downloadable package was found.'))
+				return
 			# Translators: Prompt shown when a new Enchanced Speech History version is available.
 			message = _(
 				'A new Enchanced Speech History version {latestVersion} is available. '
